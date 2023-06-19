@@ -126,7 +126,6 @@ def solve(signal,fs):
     #marca referencial
     
     signal_pico_i = signal_integrada.iloc[9,1] #inicializo pico de señal total inicial, REVISAR SI LO PUEDO QUITAR
-    print(signal_pico_i)
     pico_ruido_i = 0 #inicializo pico de ruido total inicial REVISAR SI LO PUEDO QUITAR
         
     spk_i = signal_pico_i #Corriendo la señal pico estimada
@@ -156,35 +155,135 @@ def solve(signal,fs):
         
         #ida
         if (signal_integrada.iloc[i,1] >= umbral1_i): #si la señal es mayor o igual al umbral
-            if(index_pico_i[-1]+200 <i): # periodo refractario de 200ms antes del proximo
+            if(index_pico_i[-1]+fs <i): # periodo refractario de 200ms antes del proximo
                 index_pico_i.append(i) #almaceno indice del pico
                 detalles_pico_i.append([signal_integrada.iloc[i,0], signal_integrada.iloc[i,1]]) #voltaje y posicion del pico
-                
+               
         #vuelta
         #2.2: chequeando la clasificacion como una señal pico usando umbral1 y luego umbral2
         else:
             if(signal_integrada.iloc[i,1]>=umbral2_i):
-                if(index_pico_i[-1]+200 <i): # periodo refractario de 200ms antes del proximo
+                if(index_pico_i[-1]+fs <i): # periodo refractario de 200ms antes del proximo
                     index_pico_i.append(i) #almaceno indice del pico
                     detalles_pico_i.append([signal_integrada.iloc[i,0], signal_integrada.iloc[i,1]]) #voltaje y posicion del pico
                     spk_i = 0.25*signal_pico_i + 0.75*spk_i #actualizo spk_i con el searchback
-    '''
-    print(detalles_pico_i)
+        
+    
     print("STEP 2: thresholds and detection on integration waveform (s4)")
     print("Step 2: npk_i: ",npk_i)
     print("Step 2: spk_i: ",spk_i)
     print("Step 2: Threshold 1_i: ",umbral1_i)
     print("Step 2: Threshold 2_i: ",umbral2_i)
-    print("Step 2: Number of peaks is: ",len(index_pico_i))
+    print("Step 2: Number of peaks is: ",len(detalles_pico_i))
+    
+    '''
+    Two separate measurements of the average RR interval are maintained. One RR-interval average is the mean of all of the most recent eight RR intervals.
+    A second RR -interval average is the mean of the most recent eight beats that fell within the range of 92-116 percent of the current RR-interval average. Without this first average,
+    this approach would be suitable only for a slowly changing and regular heart rate. When the heart rate suddenly changes, the first RR-interval average substitutes for the second one.
+    This heart rate is now in terms of a time period. We then convert it to beats per minute.
+    '''
+        
+        
+
+    op_x = []
+    op_y = []
+    for i in range(0,len(detalles_pico_i)):
+        #print(output_signal[i][0])
+        op_x.append(detalles_pico_i[i][0])
+        op_y.append(detalles_pico_i[i][1]/1500)
+   
+    
+    
+    #print(op_x)
+    RR1 = np.diff(op_x) #hago la diferencia entre las posiciones de los picos R
+    RR2 = []
+    #print('RR1: ',RR1)
+    RR_average = np.mean(RR1[-8:]) #saco la media de los ultimos 8 picos
+    #print('RR1_average: ', RR_average)
+    RR_average2 = RR_average
+    RR_low_limit = 0.92*RR_average2
+    RR_high_limit = 1.16*RR_average2
+    #print(RR_low_limit, RR_high_limit)
+    
+    for i in range(1, len(RR1)):
+        if RR_low_limit < RR1[i]<RR_high_limit:
+            RR2.append(RR1[i])
+    #print('RR2: ', RR2)   
+    if(len(RR2) > 8):
+        RR2.remove(RR2[0])
+        RR_average2 = np.mean(RR2)
+    
+    #print('RR2: ', RR2)
+    
+    RR_avg_op = 60*1000/(2*RR_average) #bpm
+    if RR_average<=RR_high_limit and RR_average >= RR_low_limit: #If each of the eight most-recent sequential RR intervals that are calculated from RR AVERAGE1 is between the RR LOW LIMIT and the RR HIGH LIMIT,
+        print("Normal sinus with average heart beat (bpm)", RR_avg_op)
+    else:
+        print("Not a normal sinus with average heart beat (bpm)", RR_avg_op)
+    
+    '''
+    #GRAFICAS
+    plt.plot(signal.iloc[:,0],signal.iloc[:,1])
+    plt.vlines(op_x, ymin=min(signal.iloc[:,1])-500, ymax= max(signal.iloc[:,1])+500, color = 'r', label = 'axvline - full height')
+    plt.xlabel('samples')
+    plt.ylabel('mV')
+    plt.title('graf')
     '''
     
-    for i in range(0,len(index_pico_i)):
-        RR1 = np.diff(index_pico_i[i-8:i+1]) 
-        RR_average = np.mean(RR1)
-        print('RR1: ',RR1)
-        print(RR_average)
-        
-    print('index_ pico : ',index_pico_i)
+    
+    
+    
+    
+    
+    
+    
+   
+    
+    
+    
+    
+    
+
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    '''
+    fig = plt.figure(figsize=(20,20))
+    fig.set_dpi(50)
+    
+    
+    
+    
+    ax1=fig.add_subplot(6,1,1)
+    ax1.plot(signal.iloc[:,0], signal.iloc[:,1])
+    ax1.set_xticks(np.arange(0, len(signal.iloc[:,0]), 100))
+    ax1.set_title('Original ECG')
+    ax1.set_xlabel('Time (ms)')
+    ax1.set_ylabel('mV')
+    
+    ax2 = fig.add_subplot(6,1,1)
+    ax2.stem(op_x, op_y)
+    ax2.set_title('Output pulse stream')
+    ax2.set_xlabel('Time (ms)')
+    ax2.set_ylabel('mV')
+    '''
+    return detalles_pico_i
     
     
     
